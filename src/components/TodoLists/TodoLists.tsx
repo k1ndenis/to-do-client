@@ -1,15 +1,51 @@
 import { useState, useEffect } from "react"
 import { TodoList } from "../TodoList/TodoList";
 import type { TodoListType, TodoElementType } from "../../types/types";
+import {
+  DndContext,
+  closestCenter,
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+function SortableTodoCard({ todo, children }: { todo: TodoListType; children: React.ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: todo.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="todo-list-card">
+      {/* Отдельный блок для захвата мышкой (ручка перетаскивания) */}
+      <div {...attributes} {...listeners} className="drag-handle">
+        ⋮⋮
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export const TodoLists = () => {
-  // Инициализация todos из localStorage (без useEffect)
   const [todos, setTodos] = useState<TodoListType[]>(() => {
     const savedTodos = localStorage.getItem('todo-lists');
     return savedTodos ? JSON.parse(savedTodos) : [];
   });
 
-  // Инициализация sortConfig из localStorage
   const [sortConfig, setSortConfig] = useState<{ [key: string]: string }>(() => {
     const savedSortConfig = localStorage.getItem('todo-sort-config');
     return savedSortConfig ? JSON.parse(savedSortConfig) : {};
@@ -17,12 +53,10 @@ export const TodoLists = () => {
 
   const [currentTodoName, setCurrentTodoName] = useState<string>("");
 
-  // Сохранение в localStorage при изменении todos
   useEffect(() => {
     localStorage.setItem('todo-lists', JSON.stringify(todos));
   }, [todos]);
 
-  // Сохранение sortConfig при изменении
   useEffect(() => {
     localStorage.setItem('todo-sort-config', JSON.stringify(sortConfig));
   }, [sortConfig]);
@@ -137,6 +171,16 @@ export const TodoLists = () => {
     }
   }
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = todos.findIndex(t => t.id === active.id);
+    const newIndex = todos.findIndex(t => t.id === over.id);
+    const newTodos = arrayMove(todos, oldIndex, newIndex);
+    setTodos(newTodos);
+  };
+
   return (
     <div className="todo-lists-section">
       <form className="create-list-form" onSubmit={(e) => {
@@ -161,40 +205,44 @@ export const TodoLists = () => {
       )}
 
       {todos.length > 0 && (
-        <div className="todo-lists-grid">
-          {todos.map(todo => (
-            <div key={todo.id} className="todo-list-card">
-              <div className="todo-list-header">
-                <h3 className="todo-list-title">{todo.name}</h3>
-                <div className="todo-list-buttons">
-                  <button 
-                    className="sort-list-btn"
-                    onClick={() => sortTodo(todo.id)}
-                    title="Сортировать задачи"
-                  >
-                    {getSortIcon(todo.id)}
-                  </button>
-                  <button 
-                    className="delete-list-btn"
-                    onClick={() => deleteTodo(todo.id)}
-                    title="Удалить список"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-              <div className="todo-list-body">
-                <TodoList
-                  listId={todo.id}
-                  tasks={todo.tasks}
-                  onAddTask={addTaskToList}
-                  onToggleTask={toggleTaskInList}
-                  onDeleteTask={deleteTaskFromList}
-                />
-              </div>
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={todos.map(t => t.id)}>
+            <div className="todo-lists-grid">
+              {todos.map(todo => (
+                <SortableTodoCard key={todo.id} todo={todo}>
+                  <div className="todo-list-header">
+                    <h3 className="todo-list-title">{todo.name}</h3>
+                    <div className="todo-list-buttons">
+                      <button 
+                        className="sort-list-btn"
+                        onClick={() => sortTodo(todo.id)}
+                        title="Сортировать задачи"
+                      >
+                        {getSortIcon(todo.id)}
+                      </button>
+                      <button 
+                        className="delete-list-btn"
+                        onClick={() => deleteTodo(todo.id)}
+                        title="Удалить список"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                  <div className="todo-list-body">
+                    <TodoList
+                      listId={todo.id}
+                      tasks={todo.tasks}
+                      onAddTask={addTaskToList}
+                      onToggleTask={toggleTaskInList}
+                      onDeleteTask={deleteTaskFromList}
+                    />
+                  </div>
+                </SortableTodoCard>
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   )

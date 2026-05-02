@@ -339,3 +339,24 @@ body {
   background: rgba(255, 255, 255, 0.3);
   transform: scale(1.05);
 }
+
+.drag-handle {
+  cursor: grab;
+  text-align: center;
+  padding: 8px;
+  font-size: 20px;
+  letter-spacing: 4px;
+  color: #9ca3af;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle:hover {
+  color: #667eea;
+  background: #f3f4f6;
+}
