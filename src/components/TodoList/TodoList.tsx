@@ -1,42 +1,73 @@
 import { useState } from "react"
 import type { TodoElementType } from "../../types/types"
 
-export const TodoList = () => {
-  const [todo, setTodo] = useState<TodoElementType[]>([]);
+interface TodoListProps {
+  listId: string;
+  tasks: TodoElementType[];
+  onAddTask: (listId: string, taskValue: string) => void;
+  onToggleTask: (listId: string, taskId: string) => void;
+  onDeleteTask: (listId: string, taskId: string) => void;
+}
+
+export const TodoList = ({ listId, tasks, onAddTask, onToggleTask, onDeleteTask }: TodoListProps) => {
   const [currentTask, setCurrentTask] = useState<string>("");
 
-  const addTask = ( taskValue: string ) => {
+  const addTask = (taskValue: string) => {
     if (!taskValue.trim()) return;
-    const task = {
-      id: crypto.randomUUID(),
-      value: taskValue,
-      createdAt: +new Date()
-    }
-    setTodo(prev => [task, ...prev]);
+    onAddTask(listId, taskValue);
     setCurrentTask("");
   }
 
   return (
-    <ul>
-      <li>
+    <div>
+      <form className="add-task-form" onSubmit={(e) => {
+        e.preventDefault();
+        addTask(currentTask);
+      }}>
         <input
-          placeholder="Введите задачу..."
+          className="add-task-input"
+          placeholder="Новая задача..."
           value={currentTask}
           onChange={(e) => setCurrentTask(e.target.value)}
-        >
-        
-        </input>
-        <button
-          onClick={() => addTask(currentTask)}
-        >
-          Добавить задачу
+        />
+        <button className="add-task-button" type="submit">
+          + Добавить
         </button>
-      </li>
-      {todo.length > 0 && todo.map((el: TodoElementType) => (
-        <li key={el.id}>
-          {el.value} - {el.createdAt}
-        </li>
-      ))}
-    </ul>
+      </form>
+
+      {tasks.length === 0 && (
+        <div className="empty-tasks-message">
+          ✨ Нет задач. Добавьте первую!
+        </div>
+      )}
+
+      {tasks.length > 0 && (
+        <ul className="tasks-list">
+          {tasks.map(task => (
+            <li key={task.id} className="task-item">
+              <input
+                type="checkbox"
+                className="task-checkbox"
+                checked={task.completed}
+                onChange={() => onToggleTask(listId, task.id)}
+              />
+              <span className={`task-text ${task.completed ? 'completed' : ''}`}>
+                {task.value}
+              </span>
+              <span className="task-time">
+                {new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <button
+                className="delete-task-btn"
+                onClick={() => onDeleteTask(listId, task.id)}
+                title="Удалить задачу"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
