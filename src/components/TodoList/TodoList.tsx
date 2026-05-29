@@ -52,7 +52,7 @@ export const TodoList = ({ listId, tasks, onAddTask, onToggleTask, onDeleteTask 
                 onChange={() => onToggleTask(listId, task.id)}
               />
               <span className={`task-text ${task.completed ? 'completed' : ''}`}>
-                {task.value}
+                {task.title}
               </span>
               <span className="task-time">
                 {new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

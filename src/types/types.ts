@@ -1,13 +1,13 @@
 export interface TodoElementType {
   id: string;
-  value: string;
+  title: string;
   completed: boolean;
   createdAt: number;
 }
 
 export interface TodoListType {
   id: string;
-  name: string;
+  title: string;
   tasks: TodoElementType[];
   createdAt: number;
 }

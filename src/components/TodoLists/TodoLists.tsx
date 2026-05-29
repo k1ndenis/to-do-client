@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { TodoList } from "../TodoList/TodoList";
-import type { TodoListType, TodoElementType } from "../../types/types";
+import type { TodoListType } from "../../types/types";
+import { todoApi } from "./../../api/todos";
 import {
   DndContext,
   closestCenter,
@@ -31,7 +32,6 @@ function SortableTodoCard({ todo, children }: { todo: TodoListType; children: Re
 
   return (
     <div ref={setNodeRef} style={style} className="todo-list-card">
-      {/* Отдельный блок для захвата мышкой (ручка перетаскивания) */}
       <div {...attributes} {...listeners} className="drag-handle">
         ⋮⋮
       </div>
@@ -41,83 +41,112 @@ function SortableTodoCard({ todo, children }: { todo: TodoListType; children: Re
 }
 
 export const TodoLists = () => {
-  const [todos, setTodos] = useState<TodoListType[]>(() => {
-    const savedTodos = localStorage.getItem('todo-lists');
-    return savedTodos ? JSON.parse(savedTodos) : [];
-  });
-
+  const [todos, setTodos] = useState<TodoListType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ [key: string]: string }>(() => {
     const savedSortConfig = localStorage.getItem('todo-sort-config');
     return savedSortConfig ? JSON.parse(savedSortConfig) : {};
   });
-
   const [currentTodoName, setCurrentTodoName] = useState<string>("");
 
   useEffect(() => {
-    localStorage.setItem('todo-lists', JSON.stringify(todos));
-  }, [todos]);
+    fetchLists();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('todo-sort-config', JSON.stringify(sortConfig));
   }, [sortConfig]);
 
-  const createTodo = (name: string) => {
+  const fetchLists = async () => {
+    setLoading(true);
+    try {
+      const response = await todoApi.getLists();
+      setTodos(response.data);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Ошибка загрузки списков');
+      console.error('Error fetching lists:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createTodo = async (name: string) => {
     if (!name.trim()) return;
-    const todoList: TodoListType = {
-      id: crypto.randomUUID(),
-      name: name,
-      tasks: [],
-      createdAt: +new Date()
-    };
-    setTodos(prev => [todoList, ...prev]);
-    setCurrentTodoName("");
+    try {
+      const response = await todoApi.createList(name);
+      setTodos(prev => [response.data, ...prev]);
+      setCurrentTodoName("");
+    } catch (err: any) {
+      setError(err.message || 'Ошибка создания списка');
+      console.error('Error creating list:', err);
+    }
   }
 
-  const deleteTodo = (id: string) => {
-    setTodos(prev => prev.filter(list => list.id !== id));
-    setSortConfig(prev => {
-      const newConfig = { ...prev };
-      delete newConfig[id];
-      return newConfig;
-    });
+  const deleteTodo = async (id: string) => {
+    try {
+      await todoApi.deleteList(id);
+      setTodos(prev => prev.filter(list => list.id !== id));
+      setSortConfig(prev => {
+        const newConfig = { ...prev };
+        delete newConfig[id];
+        return newConfig;
+      });
+    } catch (err: any) {
+      setError(err.message || 'Ошибка удаления списка');
+      console.error('Error deleting list:', err);
+    }
   }
 
-  const addTaskToList = (listId: string, taskValue: string) => {
+  const addTaskToList = async (listId: string, taskValue: string) => {
     if (!taskValue.trim()) return;
-    const newTask: TodoElementType = {
-      id: crypto.randomUUID(),
-      value: taskValue,
-      completed: false,
-      createdAt: +new Date()
-    };
-    setTodos(prev => prev.map(list =>
-      list.id === listId
-        ? { ...list, tasks: [newTask, ...list.tasks] }
-        : list
-    ));
+    try {
+      const response = await todoApi.createTask(listId, taskValue);
+      setTodos(prev => prev.map(list =>
+        list.id === listId
+          ? { ...list, tasks: [response.data, ...list.tasks] }
+          : list
+      ));
+    } catch (err: any) {
+      setError(err.message || 'Ошибка создания задачи');
+      console.error('Error creating task:', err);
+    }
   }
 
-  const toggleTaskInList = (listId: string, taskId: string) => {
-    setTodos(prev => prev.map(list =>
-      list.id === listId
-        ? {
-            ...list,
-            tasks: list.tasks.map(task =>
-              task.id === taskId
-                ? { ...task, completed: !task.completed }
-                : task
-            )
-          }
-        : list
-    ));
+  const toggleTaskInList = async (listId: string, taskId: string) => {
+    try {
+      const response = await todoApi.toggleTask(listId, taskId);
+      setTodos(prev => prev.map(list =>
+        list.id === listId
+          ? {
+              ...list,
+              tasks: list.tasks.map(task =>
+                task.id === taskId
+                  ? response.data
+                  : task
+              )
+            }
+          : list
+      ));
+    } catch (err: any) {
+      setError(err.message || 'Ошибка обновления задачи');
+      console.error('Error toggling task:', err);
+    }
   }
 
-  const deleteTaskFromList = (listId: string, taskId: string) => {
-    setTodos(prev => prev.map(list =>
-      list.id === listId
-        ? { ...list, tasks: list.tasks.filter(task => task.id !== taskId) }
-        : list
-    ));
+  const deleteTaskFromList = async (listId: string, taskId: string) => {
+    try {
+      await todoApi.deleteTask(listId,taskId);
+      setTodos(prev => prev.map(list =>
+        list.id === listId
+          ? { ...list, tasks: list.tasks.filter(task => task.id !== taskId) }
+          : list
+      ));
+    } catch (err: any) {
+      setError(err.message || 'Ошибка удаления задачи');
+      console.error('Error deleting task:', err);
+    }
   }
 
   const sortTodo = (listId: string) => {
@@ -148,10 +177,10 @@ export const TodoLists = () => {
           sortedTasks.sort((a, b) => Number(a.completed) - Number(b.completed));
           break;
         case 'alpha-asc':
-          sortedTasks.sort((a, b) => a.value.localeCompare(b.value));
+          sortedTasks.sort((a, b) => a.title.localeCompare(b.title));
           break;
         case 'alpha-desc':
-          sortedTasks.sort((a, b) => b.value.localeCompare(a.value));
+          sortedTasks.sort((a, b) => b.title.localeCompare(a.title));
           break;
       }
       
@@ -171,7 +200,7 @@ export const TodoLists = () => {
     }
   }
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -179,7 +208,27 @@ export const TodoLists = () => {
     const newIndex = todos.findIndex(t => t.id === over.id);
     const newTodos = arrayMove(todos, oldIndex, newIndex);
     setTodos(newTodos);
+    
+    // TODO: Если нужно сохранять порядок списков на бэкенде, добавить API вызов
+    // try {
+    //   await todoApi.reorderLists(newTodos.map(t => t.id));
+    // } catch (err) {
+    //   console.error('Error reordering lists:', err);
+    // }
   };
+
+  if (loading) {
+    return <div className="loading">Загрузка списков...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="error-message">
+        <p>Ошибка: {error}</p>
+        <button onClick={fetchLists}>Повторить</button>
+      </div>
+    );
+  }
 
   return (
     <div className="todo-lists-section">
@@ -211,7 +260,7 @@ export const TodoLists = () => {
               {todos.map(todo => (
                 <SortableTodoCard key={todo.id} todo={todo}>
                   <div className="todo-list-header">
-                    <h3 className="todo-list-title">{todo.name}</h3>
+                    <h3 className="todo-list-title">{todo.title}</h3>
                     <div className="todo-list-buttons">
                       <button 
                         className="sort-list-btn"
